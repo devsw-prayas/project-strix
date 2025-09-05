@@ -1,0 +1,126 @@
+# auth DAG nodes 3 nodes + 1 monitor
+services:
+  strix_auth_node_a:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: strix_auth_node_a
+      POSTGRES_PASSWORD: strix
+      POSTGRES_DB: strix_node_DB_A
+    ports: ["5433:5432"]
+    volumes:
+      - strix_data_node_a:/var/lib/postgresql/data
+      - ./db/node_schema.sql:/docker-entrypoint-initdb.d/node_schema.sql:ro
+
+  strix_auth_node_b:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: strix_auth_node_b
+      POSTGRES_PASSWORD: strix
+      POSTGRES_DB: strix_node_DB_B
+    ports: ["5434:5432"]
+    volumes:
+      - strix_data_node_b:/var/lib/postgresql/data
+      - ./db/node_schema.sql:/docker-entrypoint-initdb.d/node_schema.sql:ro
+
+  strix_auth_node_c:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: strix_auth_node_c
+      POSTGRES_PASSWORD: strix
+      POSTGRES_DB: strix_node_DB_C
+    ports: ["5435:5432"]
+    volumes:
+      - strix_data_node_c:/var/lib/postgresql/data
+      - ./db/node_schema.sql:/docker-entrypoint-initdb.d/node_schema.sql:ro
+
+  strix_monitor_node:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: frontend_orchestration_monitor
+      POSTGRES_PASSWORD: strix
+      POSTGRES_DB: status_output
+    ports: ["5437:5432"]
+    volumes:
+      - strix_data_monitor:/var/lib/postgresql/data
+      - ./db/monitor_schema.sql:/docker-entrypoint-initdb.d/monitor_schema.sql:ro
+
+  # Backend services (built from repo root with Dockerfile + TARGET arg)
+  strix_auth_backend_a:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        TARGET: node      # builds ./node/main.go
+    image: strix_auth_backend_a:latest
+    environment:
+      MONITOR_URL: http://strix_backend_monitor_node:8085
+      NODE_ID: node1
+      DATABASE_URL: postgres://strix_auth_node_a:strix@strix_auth_node_a:5432/strix_node_DB_A?sslmode=disable
+      DAG_TYPE: auth
+      PORT: "8081"
+      PEERS: http://node2:8080,http://node3:8080
+    depends_on:
+      - strix_auth_node_a
+    ports:
+      - "8081:8080"
+
+  strix_auth_backend_b:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        TARGET: node
+    image: strix_auth_backend_b:latest
+    environment:
+      MONITOR_URL: http://strix_backend_monitor_node:8085
+      NODE_ID: node2
+      DATABASE_URL: postgres://strix_auth_node_b:strix@strix_auth_node_b:5432/strix_node_DB_B?sslmode=disable
+      DAG_TYPE: auth
+      PORT: "8082"
+      PEERS: http://node1:8080,http://node3:8080
+    depends_on:
+      - strix_auth_node_b
+    ports:
+      - "8082:8080"
+
+  strix_auth_backend_c:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        TARGET: node
+    image: strix_auth_backend_c:latest
+    environment:
+      MONITOR_URL: http://strix_backend_monitor_node:8085
+      NODE_ID: node3
+      DATABASE_URL: postgres://strix_auth_node_c:strix@strix_auth_node_c:5432/strix_node_DB_C?sslmode=disable
+      DAG_TYPE: auth
+      PORT: "8083"
+      PEERS: http://node1:8080,http://node2:8080
+    depends_on:
+      - strix_auth_node_c
+    ports:
+      - "8083:8080"
+    
+  strix_backend_monitor_node:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        TARGET: monitor   # builds ./monitor/main.go
+    image: strix_auth_monitor:latest
+    environment:
+      NODE_ID: monitor
+      DATABASE_URL: postgres://frontend_orchestration_monitor:strix@strix_monitor_node:5432/status_output?sslmode=disable
+      PORT: "8084"
+      MONITOR_ONLY: "true"
+    depends_on:
+      - strix_monitor_node
+    ports:
+      - "8084:8080"
+
+volumes:
+  strix_data_node_a:
+  strix_data_node_b:
+  strix_data_node_c:
+  strix_data_monitor:

@@ -1,0 +1,56 @@
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binary, build output
+*.test
+*.out
+
+# Go build artifacts
+/bin/
+/build/
+/dist/
+/cover/
+/tmp/
+
+# Go modules
+vendor/
+*.modcache
+
+# IDE/editor files
+.vscode/
+/.idea/        # JetBrains GoLand / IntelliJ
+*.swp
+*.swo
+*~
+
+# Logs
+*.log
+*.pid
+*.seed
+*.coverprofile
+*.cov
+*.prof
+
+# Docker artifacts
+*.pid
+*.seed
+*.bak
+.docker/
+docker-compose.override.yml
+
+# OS generated files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# PostgreSQL data volumes (if you accidentally init outside Docker)
+pgdata*/
+*.sql~
+
+# Exclude local env files
+.env
+.env.*

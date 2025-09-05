@@ -1,0 +1,157 @@
+# global DAG nodes 4 nodes + 1 monitor
+services:
+  strix_global_node_a:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: strix_global_node_a
+      POSTGRES_PASSWORD: strix
+      POSTGRES_DB: strix_node_DB_A
+    ports: ["5438:5432"]
+    volumes:
+      - strix_data_node_a:/var/lib/postgresql/data
+      - ./db/global_node_schema.sql:/docker-entrypoint-initdb.d/node_schema.sql:ro
+
+  strix_global_node_b:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: strix_global_node_b
+      POSTGRES_PASSWORD: strix
+      POSTGRES_DB: strix_node_DB_B
+    ports: ["5439:5432"]
+    volumes:
+      - strix_data_node_b:/var/lib/postgresql/data
+      - ./db/global_node_schema.sql:/docker-entrypoint-initdb.d/node_schema.sql:ro
+
+  strix_global_node_c:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: strix_global_node_c
+      POSTGRES_PASSWORD: strix
+      POSTGRES_DB: strix_node_DB_C
+    ports: ["5440:5432"]
+    volumes:
+      - strix_data_node_c:/var/lib/postgresql/data
+      - ./db/global_node_schema.sql:/docker-entrypoint-initdb.d/node_schema.sql:ro
+
+  strix_global_node_d:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: strix_global_node_d
+      POSTGRES_PASSWORD: strix
+      POSTGRES_DB: strix_node_DB_D
+    ports: ["5441:5432"]
+    volumes:
+      - strix_data_node_d:/var/lib/postgresql/data
+      - ./db/global_node_schema.sql:/docker-entrypoint-initdb.d/node_schema.sql:ro
+
+  strix_monitor_node:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: frontend_orchestration_monitor
+      POSTGRES_PASSWORD: strix
+      POSTGRES_DB: status_output
+    ports: ["5442:5432"]
+    volumes:
+      - strix_data_monitor:/var/lib/postgresql/data
+      - ./db/monitor_schema.sql:/docker-entrypoint-initdb.d/monitor_schema.sql:ro
+
+  # Backend services
+  strix_global_backend_a:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        TARGET: node
+    image: strix_global_backend_a:latest
+    environment:
+      MONITOR_URL: http://strix_backend_monitor_node:8085
+      NODE_ID: node1
+      DATABASE_URL: postgres://strix_global_node_a:strix@strix_global_node_a:5432/strix_node_DB_A?sslmode=disable
+      DAG_TYPE: global
+      PORT: "8085"
+      PEERS: http://node2:8080,http://node3:8080,http://node4:8080
+    depends_on:
+      - strix_global_node_a
+    ports:
+      - "8085:8080"
+
+  strix_global_backend_b:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        TARGET: node
+    image: strix_global_backend_b:latest
+    environment:
+      MONITOR_URL: http://strix_backend_monitor_node:8085
+      NODE_ID: node2
+      DATABASE_URL: postgres://strix_global_node_b:strix@strix_global_node_b:5432/strix_node_DB_B?sslmode=disable
+      DAG_TYPE: global
+      PORT: "8086"
+      PEERS: http://node1:8080,http://node3:8080,http://node4:8080
+    depends_on:
+      - strix_global_node_b
+    ports:
+      - "8086:8080"
+
+  strix_global_backend_c:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        TARGET: node
+    image: strix_global_backend_c:latest
+    environment:
+      MONITOR_URL: http://strix_backend_monitor_node:8085
+      NODE_ID: node3
+      DATABASE_URL: postgres://strix_global_node_c:strix@strix_global_node_c:5432/strix_node_DB_C?sslmode=disable
+      DAG_TYPE: global
+      PORT: "8087"
+      PEERS: http://node1:8080,http://node2:8080,http://node4:8080
+    depends_on:
+      - strix_global_node_c
+    ports:
+      - "8087:8080"
+
+  strix_global_backend_d:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        TARGET: node
+    image: strix_global_backend_d:latest
+    environment:
+      MONITOR_URL: http://strix_backend_monitor_node:8085
+      NODE_ID: node4
+      DATABASE_URL: postgres://strix_global_node_d:strix@strix_global_node_d:5432/strix_node_DB_D?sslmode=disable
+      DAG_TYPE: global
+      PORT: "8088"
+      PEERS: http://node1:8080,http://node2:8080,http://node3:8080
+    depends_on:
+      - strix_global_node_d
+    ports:
+      - "8088:8080"
+    
+  strix_backend_monitor_node:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        TARGET: monitor
+    image: strix_global_monitor:latest
+    environment:
+      NODE_ID: monitor
+      DATABASE_URL: postgres://frontend_orchestration_monitor:strix@strix_monitor_node:5432/status_output?sslmode=disable
+      PORT: "8089"
+      MONITOR_ONLY: "true"
+    depends_on:
+      - strix_monitor_node
+    ports:
+      - "8089:8080"
+
+volumes:
+  strix_data_node_a:
+  strix_data_node_b:
+  strix_data_node_c:
+  strix_data_node_d:
+  strix_data_monitor:
