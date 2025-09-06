@@ -1,4 +1,3 @@
-// faketpm/faketpm.go
 package faketpm
 
 import (
@@ -23,11 +22,12 @@ const gcmNonceSize = 12 // AES-GCM standard nonce size
 
 // Attestation contains the child public key metadata and parent signature.
 type Attestation struct {
-	ChildPubB64 string `json:"child_pub_b64"`
-	CreatedAt   int64  `json:"created_at_unix"`
-	Policy      string `json:"policy,omitempty"`
-	Counter     uint64 `json:"counter"`
-	SigB64      string `json:"sig_b64"` // parent signature over the payload
+	ChildPubB64      string `json:"child_pub_b64"`
+	CreatedAtUnix    int64  `json:"created_at_unix"`
+	Policy           string `json:"policy"`
+	Counter          uint64 `json:"counter"`
+	SigB64           string `json:"sig_b64"`
+	SignedPayloadB64 string `json:"signed_payload_b64,omitempty"` // exact bytes that were signed (base64)
 }
 
 // TPM represents the fake TPM instance.
@@ -155,7 +155,7 @@ func (t *TPM) CreateChild(id, policy string) (string, Attestation, error) {
 			id:        id,
 			pub:       ed25519.PublicKey(pubBytes),
 			priv:      nil, // private not present after restart
-			createdAt: a.CreatedAt,
+			createdAt: a.CreatedAtUnix,
 			counter:   a.Counter,
 			att:       a,
 		}
@@ -170,20 +170,27 @@ func (t *TPM) CreateChild(id, policy string) (string, Attestation, error) {
 	}
 	now := time.Now().Unix()
 	att := Attestation{
-		ChildPubB64: base64.StdEncoding.EncodeToString(pub),
-		CreatedAt:   now,
-		Policy:      policy,
-		Counter:     0,
+		ChildPubB64:   base64.StdEncoding.EncodeToString(pub),
+		CreatedAtUnix: now,
+		Policy:        policy,
+		Counter:       0,
 	}
-	// sign attestation payload with parent private
-	payload, _ := json.Marshal(struct {
+
+	// Build the exact payload bytes we will sign (JSON of the canonical struct).
+	payload, err := json.Marshal(struct {
 		ChildPubB64 string `json:"child_pub_b64"`
 		CreatedAt   int64  `json:"created_at_unix"`
 		Policy      string `json:"policy,omitempty"`
 		Counter     uint64 `json:"counter"`
-	}{att.ChildPubB64, att.CreatedAt, att.Policy, att.Counter})
+	}{att.ChildPubB64, att.CreatedAtUnix, att.Policy, att.Counter})
+	if err != nil {
+		return "", Attestation{}, fmt.Errorf("failed to marshal attestation payload: %w", err)
+	}
+
+	// sign the payload bytes with parent private
 	sig := ed25519.Sign(t.parentPriv, payload)
 	att.SigB64 = base64.StdEncoding.EncodeToString(sig)
+	att.SignedPayloadB64 = base64.StdEncoding.EncodeToString(payload)
 
 	c := &child{
 		id:        id,
@@ -221,14 +228,23 @@ func (t *TPM) Sign(childID string, msg []byte) ([]byte, Attestation, error) {
 	// increment counter, update attestation and persist it
 	c.counter++
 	c.att.Counter = c.counter
-	payload, _ := json.Marshal(struct {
+
+	payload, err := json.Marshal(struct {
 		ChildPubB64 string `json:"child_pub_b64"`
 		CreatedAt   int64  `json:"created_at_unix"`
 		Policy      string `json:"policy,omitempty"`
 		Counter     uint64 `json:"counter"`
-	}{c.att.ChildPubB64, c.att.CreatedAt, c.att.Policy, c.att.Counter})
+	}{c.att.ChildPubB64, c.att.CreatedAtUnix, c.att.Policy, c.att.Counter})
+	if err != nil {
+		// still sign the child message even if marshal failed (but return error)
+		childSig := ed25519.Sign(c.priv, msg)
+		return childSig, c.att, fmt.Errorf("failed to marshal att payload: %w", err)
+	}
+
+	// sign the payload with parent private and update attestation fields
 	sig := ed25519.Sign(t.parentPriv, payload)
 	c.att.SigB64 = base64.StdEncoding.EncodeToString(sig)
+	c.att.SignedPayloadB64 = base64.StdEncoding.EncodeToString(payload)
 
 	// persist updated attestation (so counter survives restarts)
 	if err := t.persistChildMetadata(childID, c.att); err != nil {
@@ -264,7 +280,7 @@ func (t *TPM) GetChildInfo(id string) (Attestation, error) {
 			id:        id,
 			pub:       ed25519.PublicKey(pub),
 			priv:      nil,
-			createdAt: a.CreatedAt,
+			createdAt: a.CreatedAtUnix,
 			counter:   a.Counter,
 			att:       a,
 		}
@@ -285,12 +301,23 @@ func VerifyChain(parentPub, msg, childSig []byte, att Attestation) error {
 	if err != nil {
 		return err
 	}
-	payload, _ := json.Marshal(struct {
-		ChildPubB64 string `json:"child_pub_b64"`
-		CreatedAt   int64  `json:"created_at_unix"`
-		Policy      string `json:"policy,omitempty"`
-		Counter     uint64 `json:"counter"`
-	}{att.ChildPubB64, att.CreatedAt, att.Policy, att.Counter})
+
+	var payload []byte
+	// prefer SignedPayloadB64 if present
+	if att.SignedPayloadB64 != "" {
+		payload, err = base64.StdEncoding.DecodeString(att.SignedPayloadB64)
+		if err != nil {
+			return fmt.Errorf("bad signed_payload_b64: %w", err)
+		}
+	} else {
+		// fallback to building the canonical payload
+		payload, _ = json.Marshal(struct {
+			ChildPubB64 string `json:"child_pub_b64"`
+			CreatedAt   int64  `json:"created_at_unix"`
+			Policy      string `json:"policy,omitempty"`
+			Counter     uint64 `json:"counter"`
+		}{att.ChildPubB64, att.CreatedAtUnix, att.Policy, att.Counter})
+	}
 
 	if !ed25519.Verify(ed25519.PublicKey(parentPub), payload, attSig) {
 		return errors.New("invalid attestation signature")
@@ -462,7 +489,7 @@ func (t *TPM) loadPersistedChildrenMetadata() error {
 			id:        id,
 			pub:       ed25519.PublicKey(pub),
 			priv:      nil,
-			createdAt: a.CreatedAt,
+			createdAt: a.CreatedAtUnix,
 			counter:   a.Counter,
 			att:       a,
 		}
@@ -470,7 +497,7 @@ func (t *TPM) loadPersistedChildrenMetadata() error {
 	}
 	return nil
 }
-	
+
 func exists(path string) bool {
 	_, err := os.Stat(path)
 	return err == nil

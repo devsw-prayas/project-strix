@@ -10,6 +10,7 @@ services:
     volumes:
       - strix_data_node_a:/var/lib/postgresql/data
       - ./db/node_schema.sql:/docker-entrypoint-initdb.d/node_schema.sql:ro
+      
 
   strix_auth_node_b:
     image: postgres:15

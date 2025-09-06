@@ -29,5 +29,4 @@ FROM alpine:3.18
 RUN addgroup -S app && adduser -S app -G app
 COPY --from=builder /server /server
 EXPOSE 8080
-USER app
 ENTRYPOINT ["/server"]
