@@ -11,6 +11,8 @@ import (
 	"strings"
 	"time"
 
+	tpm "hackodisha/backend/tpm"
+
 	"github.com/gin-gonic/gin"
 	_ "github.com/lib/pq"
 )
@@ -23,15 +25,49 @@ type heartbeatPayload struct {
 }
 
 func main() {
+
+	storage := os.Getenv("FAKE_TPM_STORAGE")
+	if storage == "" {
+		storage = "/data/tpm"
+	}
+
+	// Initialize fake TPM with encrypted parent key
+	fake, err := tpm.NewWithEncryptedStorageFromEnv(storage)
+	if err != nil {
+		log.Fatalf("failed to init TPM: %v", err)
+	}
+
+	// Print parent public key (base64) once — stable across restarts
+	fmt.Println("Parent pub (b64):", fake.ParentPublicB64())
+
+	// Create a child for this node (id = NODE_ID from compose)
+	nodeID := os.Getenv("NODE_ID")
+	if nodeID == "" {
+		nodeID = "default-node"
+	}
+
+	_, att, err := fake.CreateChild(nodeID, "auth-node")
+	if err != nil {
+		log.Fatalf("create child failed: %v", err)
+	}
+	fmt.Println("Child attestation:", att)
+
+	// Example: sign something
+	msg := []byte("Test Signing")
+	sig, att2, err := fake.Sign(nodeID, msg)
+	if err != nil {
+		log.Printf("Sign error (maybe after restart, no private in memory): %v", err)
+	} else {
+		fmt.Println("Child signature (len):", len(sig))
+		fmt.Println("Attestation after sign:", att2)
+	}
+
 	// Config
 	dsn := os.Getenv("DATABASE_URL")
 	if dsn == "" {
 		dsn = "postgres://hack:hack@127.0.0.1:5433/hackodisha_node1?sslmode=disable"
 	}
-	nodeID := os.Getenv("NODE_ID")
-	if nodeID == "" {
-		nodeID = "node"
-	}
+
 	peers := os.Getenv("PEERS")
 	var peerList []string
 	if peers != "" {
@@ -81,7 +117,11 @@ func main() {
 		log.Fatalf("open db: %v", err)
 	}
 	// keep DB open if you plan to use it, otherwise you can close immediately
-	defer db.Close()
+	defer func(db *sql.DB) {
+		err := db.Close()
+		if err != nil {
+		}
+	}(db)
 
 	// Start heartbeat goroutine if MONITOR_URL is provided
 	if monitorURL != "" {
@@ -163,7 +203,10 @@ func waitForPostgres(dsn string, timeout time.Duration) error {
 		db, err := sql.Open("postgres", dsn)
 		if err == nil {
 			err = db.Ping()
-			db.Close()
+			err := db.Close()
+			if err != nil {
+				return err
+			}
 		}
 		if err == nil {
 			return nil

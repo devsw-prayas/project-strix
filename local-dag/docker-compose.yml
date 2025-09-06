@@ -64,11 +64,13 @@ services:
         TARGET: node
     image: strix_local_backend_a:latest
     environment:
-      MONITOR_URL: http://strix_local_backend_monitor_node:8085
+      MONITOR_URL: http://strix_local_backend_monitor_node:8094
       NODE_ID: node1
       DATABASE_URL: postgres://strix_local_node_a:strix@strix_local_node_a:5432/strix_node_DB_A?sslmode=disable
       DAG_TYPE: local
       PORT: "8090"
+      FAKE_TPM_MASTER_KEY: secret-passcode
+      FAKE_TPM_STORAGE: /data/tpm
       PEERS: http://node2:8080,http://node3:8080,http://node4:8080
     depends_on:
       - strix_local_node_a
@@ -83,11 +85,13 @@ services:
         TARGET: node
     image: strix_local_backend_b:latest
     environment:
-      MONITOR_URL: http://strix_local_backend_monitor_node:8085
+      MONITOR_URL: http://strix_local_backend_monitor_node:8094
       NODE_ID: node2
       DATABASE_URL: postgres://strix_local_node_b:strix@strix_local_node_b:5432/strix_node_DB_B?sslmode=disable
       DAG_TYPE: local
       PORT: "8091"
+      FAKE_TPM_MASTER_KEY: secret-passcode
+      FAKE_TPM_STORAGE: /data/tpm
       PEERS: http://node1:8080,http://node3:8080,http://node4:8080
     depends_on:
       - strix_local_node_b
@@ -102,11 +106,13 @@ services:
         TARGET: node
     image: strix_local_backend_c:latest
     environment:
-      MONITOR_URL: http://strix_local_backend_monitor_node:8085
+      MONITOR_URL: http://strix_local_backend_monitor_node:8094
       NODE_ID: node3
       DATABASE_URL: postgres://strix_local_node_c:strix@strix_local_node_c:5432/strix_node_DB_C?sslmode=disable
       DAG_TYPE: local
       PORT: "8092"
+      FAKE_TPM_MASTER_KEY: secret-passcode
+      FAKE_TPM_STORAGE: /data/tpm
       PEERS: http://node1:8080,http://node2:8080,http://node4:8080
     depends_on:
       - strix_local_node_c
@@ -121,11 +127,13 @@ services:
         TARGET: node
     image: strix_local_backend_d:latest
     environment:
-      MONITOR_URL: http://strix_local_backend_monitor_node:8085
+      MONITOR_URL: http://strix_local_backend_monitor_node:8094
       NODE_ID: node4
       DATABASE_URL: postgres://strix_local_node_d:strix@strix_local_node_d:5432/strix_node_DB_D?sslmode=disable
       DAG_TYPE: local
       PORT: "8093"
+      FAKE_TPM_MASTER_KEY: secret-passcode
+      FAKE_TPM_STORAGE: /data/tpm
       PEERS: http://node1:8080,http://node2:8080,http://node3:8080
     depends_on:
       - strix_local_node_d
@@ -143,6 +151,8 @@ services:
       NODE_ID: monitor
       DATABASE_URL: postgres://frontend_orchestration_monitor:strix@strix_local_monitor_node:5432/status_output?sslmode=disable
       PORT: "8094"
+      FAKE_TPM_MASTER_KEY: secret-passcode
+      FAKE_TPM_STORAGE: /data/tpm
       MONITOR_ONLY: "true"
     depends_on:
       - strix_local_monitor_node

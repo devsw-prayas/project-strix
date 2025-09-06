@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	tpm "hackodisha/backend/tpm"
 	"log"
 	"net/http"
 	"os"
@@ -23,15 +24,49 @@ type heartbeatPayload struct {
 }
 
 func main() {
+
+	storage := os.Getenv("FAKE_TPM_STORAGE")
+	if storage == "" {
+		storage = "/data/tpm"
+	}
+
+	// Initialize fake TPM with encrypted parent key
+	fake, err := tpm.NewWithEncryptedStorageFromEnv(storage)
+	if err != nil {
+		log.Fatalf("failed to init TPM: %v", err)
+	}
+
+	// Print parent public key (base64) once — stable across restarts
+	fmt.Println("Parent pub (b64):", fake.ParentPublicB64())
+
+	// Create a child for this node (id = NODE_ID from compose)
+	nodeID := os.Getenv("NODE_ID")
+	if nodeID == "" {
+		nodeID = "default-node"
+	}
+
+	_, att, err := fake.CreateChild(nodeID, "auth-node")
+	if err != nil {
+		log.Fatalf("create child failed: %v", err)
+	}
+	fmt.Println("Child attestation:", att)
+
+	// Example: sign something
+	msg := []byte("Test Signing")
+	sig, att2, err := fake.Sign(nodeID, msg)
+	if err != nil {
+		log.Printf("Sign error (maybe after restart, no private in memory): %v", err)
+	} else {
+		fmt.Println("Child signature (len):", len(sig))
+		fmt.Println("Attestation after sign:", att2)
+	}
+
 	// Config
 	dsn := os.Getenv("DATABASE_URL")
 	if dsn == "" {
 		dsn = "postgres://hack:hack@127.0.0.1:5433/hackodisha_node1?sslmode=disable"
 	}
-	nodeID := os.Getenv("NODE_ID")
-	if nodeID == "" {
-		nodeID = "node"
-	}
+	
 	peers := os.Getenv("PEERS")
 	var peerList []string
 	if peers != "" {
