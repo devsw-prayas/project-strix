@@ -1,4 +1,4 @@
-package tpm
+package main
 
 import (
 	"crypto/aes"

@@ -1,5 +1,6 @@
 import AuthPanel from "@/app/component/auth-panel";
 import Link from "next/link";
+import AuthRedirect from "@/app/component/auth-redirect";
 
 export default function AuthPage() {
     return (
@@ -8,6 +9,7 @@ export default function AuthPage() {
             <Link href="/landing"
                 className="text-5xl  px-20 py-20 font-extrabold font-orbitron bg-gradient-to-r from-[#d1d5db] via-white to-[#00D6C1] bg-clip-text text-transparent drop-shadow-[0_0_8px_rgba(0,214,193,0.35)] hover:opacity-90 transition"
             >StriX</Link>
+            <AuthRedirect></AuthRedirect>
             <AuthPanel />
         </div>
     );

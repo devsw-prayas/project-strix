@@ -75,7 +75,7 @@ services:
     depends_on:
       - strix_local_node_a
     ports:
-      - "8090:8080"
+      - "8090:8090"
 
   strix_local_backend_b:
     build:
@@ -96,7 +96,7 @@ services:
     depends_on:
       - strix_local_node_b
     ports:
-      - "8091:8080"
+      - "8091:8091"
 
   strix_local_backend_c:
     build:
@@ -117,7 +117,7 @@ services:
     depends_on:
       - strix_local_node_c
     ports:
-      - "8092:8080"
+      - "8092:8092"
 
   strix_local_backend_d:
     build:
@@ -138,7 +138,7 @@ services:
     depends_on:
       - strix_local_node_d
     ports:
-      - "8093:8080"
+      - "8093:8093"
     
   strix_local_backend_monitor_node:
     build:
@@ -157,7 +157,7 @@ services:
     depends_on:
       - strix_local_monitor_node
     ports:
-      - "8094:8080"
+      - "8094:8094"
 
 volumes:
   strix_local_data_node_a:

@@ -2,13 +2,17 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Menu, X, User, Settings } from "lucide-react";
+import { Menu, X, User, Settings, LogOut, ChevronDown } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/app/hooks/hokk-use-auth";
 
 export default function NavBar({
                                    brandName = "StriX",
                                }: {
     brandName?: string;
 }) {
+    const router = useRouter();
+    const { user, signOut, loading: authLoading, refresh } = useAuth();
     const [mobileOpen, setMobileOpen] = useState(false);
     const [menuOpen, setMenuOpen] = useState(false);
     const menuRef = useRef<HTMLDivElement | null>(null);
@@ -36,6 +40,31 @@ export default function NavBar({
         return () => document.removeEventListener("mousedown", onDoc);
     }, [menuOpen]);
 
+    useEffect(() => {
+        // ensure auth state loaded from localStorage on mount
+        refresh();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    function handleSignOut() {
+        // call auth signOut (demo) then push to /auth
+        try {
+            signOut();
+        } catch {
+            // ignore
+        } finally {
+            setMenuOpen(false);
+            router.push("/auth");
+        }
+    }
+
+    const initials = (user?.username ?? "DU")
+        .split(" ")
+        .map((s) => s[0])
+        .join("")
+        .slice(0, 2)
+        .toUpperCase();
+
     return (
         <header className="fixed top-0 left-0 right-0 z-50 backdrop-blur bg-[#2e2e2e]/85 border-b border-white/8 shadow-[0_4px_20px_rgba(0,0,0,0.6)]">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -61,7 +90,7 @@ export default function NavBar({
                     </div>
 
                     {/* Nav links (desktop) */}
-                    <nav className="hidden md:flex items-center gap-4">
+                    <nav className="hidden md:flex items-center gap-4" aria-label="Main navigation">
                         <Link href="/dashboard" className="text-sm text-[#D1D5DB] hover:text-white px-3 py-2 rounded-md">Dashboard</Link>
                         <Link href="/transactions" className="text-sm text-[#D1D5DB] hover:text-white px-3 py-2 rounded-md">Transactions</Link>
                         <Link href="/admin" className="text-sm text-[#D1D5DB] hover:text-white px-3 py-2 rounded-md">Admin</Link>
@@ -72,7 +101,7 @@ export default function NavBar({
                     <div className="flex items-center gap-3">
                         <div className="hidden sm:flex items-center gap-3">
                             <Link
-                                href="/transactions/new"
+                                href="/transactions"
                                 className="inline-flex items-center px-4 py-2 rounded-md bg-gradient-to-r from-[#00D6C1] to-[#009bcf] text-[#062226] font-semibold shadow-[0_6px_24px_rgba(0,214,193,0.35)] hover:brightness-95 transition"
                             >
                                 New Transaction
@@ -86,24 +115,41 @@ export default function NavBar({
                                 className="inline-flex items-center gap-2 px-2 py-1 rounded-md hover:bg-white/6 focus:outline-none"
                                 aria-haspopup="true"
                                 aria-expanded={menuOpen}
+                                aria-label="Account menu"
                             >
                 <span className="inline-flex items-center justify-center h-9 w-9 rounded-full bg-[#00D6C1] text-[#062226] font-semibold">
-                  DU
+                  {user ? initials : "DU"}
                 </span>
-                                <span className="hidden md:inline text-sm text-[#E5E7EB]">Demo User</span>
+                                <span className="hidden md:inline text-sm text-[#E5E7EB]">{user?.username ?? "Demo User"}</span>
+                                <ChevronDown size={14} className="hidden md:inline text-[#9AA6A9]" />
                             </button>
 
                             {/* user menu */}
                             {menuOpen && (
-                                <div className="absolute right-0 mt-2 w-44 bg-[#111111] rounded-md border border-white/6 shadow-lg py-2 z-50">
-                                    <Link href="/profile" className="block px-4 py-2 text-sm text-[#D1D5DB] hover:bg-white/3">
-                                        <div className="flex items-center gap-2"><User size={14} /> Profile</div>
-                                    </Link>
-                                    <Link href="/settings" className="block px-4 py-2 text-sm text-[#D1D5DB] hover:bg-white/3">
-                                        <div className="flex items-center gap-2"><Settings size={14} /> Settings</div>
-                                    </Link>
-                                    <hr className="my-1 border-t border-white/6" />
-                                    <button className="w-full text-left px-4 py-2 text-sm text-[#FA5765] hover:bg-white/3">Sign out</button>
+                                <div className="absolute right-0 mt-2 w-56 bg-[#111111] rounded-md border border-white/6 shadow-lg py-2 z-50">
+                                    {user ? (
+                                        <>
+                                            <div className="px-4 py-2 border-b border-white/6">
+                                                <div className="text-sm font-medium text-white truncate">{user.username}</div>
+                                                {user.email && <div className="text-xs text-[#9AA6A9] truncate">{user.email}</div>}
+                                            </div>
+                                            <Link href="/profile" className="block px-4 py-2 text-sm text-[#D1D5DB] hover:bg-white/3">
+                                                <div className="flex items-center gap-2"><User size={14} /> Profile</div>
+                                            </Link>
+                                            <Link href="/settings" className="block px-4 py-2 text-sm text-[#D1D5DB] hover:bg-white/3">
+                                                <div className="flex items-center gap-2"><Settings size={14} /> Settings</div>
+                                            </Link>
+                                            <hr className="my-1 border-t border-white/6" />
+                                            <button onClick={handleSignOut} className="w-full text-left px-4 py-2 text-sm text-[#FA5765] hover:bg-white/3">
+                                                <div className="flex items-center gap-2"><LogOut size={14} /> Sign out</div>
+                                            </button>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Link href="/auth" className="block px-4 py-2 text-sm text-[#D1D5DB] hover:bg-white/3">Sign in</Link>
+                                            <Link href="/auth#signup" className="block px-4 py-2 text-sm text-[#D1D5DB] hover:bg-white/3">Sign up</Link>
+                                        </>
+                                    )}
                                 </div>
                             )}
                         </div>
@@ -132,7 +178,11 @@ export default function NavBar({
 
                         <div className="pt-2 border-t border-white/6 mt-2">
                             <Link href="/transactions/new" className="block px-3 py-2 rounded-md text-[#00D6C1] bg-[#061f1b]">New Transaction</Link>
-                            <Link href="/auth" className="block px-3 py-2 rounded-md text-[#D1D5DB]">Sign in</Link>
+                            {user ? (
+                                <button onClick={handleSignOut} className="w-full text-left block px-3 py-2 rounded-md text-[#FA5765]">Sign out</button>
+                            ) : (
+                                <Link href="/auth" className="block px-3 py-2 rounded-md text-[#D1D5DB]">Sign in</Link>
+                            )}
                         </div>
                     </div>
                 </div>

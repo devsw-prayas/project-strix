@@ -1,9 +1,13 @@
-import {useState} from "react";
-import {Field} from "@/app/component/auth-panel";
+"use client";
+
+import { useState } from "react";
+import { Field } from "@/app/component/auth-panel";
+import { applyLogin } from "@/lib/hooks/use-login";
+import {DEMO_SECRET_KEY_B64} from "@/lib/utils/keys"; // <-- new hook
 
 export default function SignInForm({
-                               onSuccess,
-                           }: {
+                                       onSuccess,
+                                   }: {
     onSuccess?: (id: string) => void;
 }) {
     const [identifier, setIdentifier] = useState("");
@@ -11,26 +15,56 @@ export default function SignInForm({
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
+    // Example: in real app, secret key would come from wallet/TPM/etc
+    const demoSecretKey = DEMO_SECRET_KEY_B64;
+
     const submit = async (e: React.FormEvent) => {
         e.preventDefault();
         setError(null);
+
+        if (!identifier || !password) {
+            setError("Please enter your email/username and password.");
+            return;
+        }
+
         setBusy(true);
-        // placeholder - wire to your auth
-        await new Promise((r) => setTimeout(r, 500));
-        setBusy(false);
-        if (!identifier) setError("Please enter your node id or email.");
-        else {
-            // TODO: call your auth endpoint
-            setError(null);
-            onSuccess?.(identifier);
-            alert("Demo sign-in (no backend) — replace with your auth flow.");
+        try {
+            const user = await applyLogin(
+                {
+                    emailOrUsername: identifier,
+                    password,
+                    user_pub: DEMO_SECRET_KEY_B64,
+                    node_id: "demo-node", // could be dynamic
+                },
+                demoSecretKey
+            );
+            setBusy(false);
+            onSuccess?.(user.id);
+        } catch (err: unknown) {
+            setBusy(false);
+            setError((err as Error).message ?? "Sign-in failed");
         }
     };
 
     return (
         <form onSubmit={submit} className="space-y-4">
-            <Field id="signin-identifier" label="Node ID or email" value={identifier} onChange={setIdentifier} placeholder="node-01 / demo@strix" autoComplete="username" />
-            <Field id="signin-pass" label="Password" type="password" value={password} onChange={setPassword} placeholder="demo password" autoComplete="current-password" />
+            <Field
+                id="signin-identifier"
+                label="Node ID or email"
+                value={identifier}
+                onChange={setIdentifier}
+                placeholder="node-01 / demo@strix"
+                autoComplete="username"
+            />
+            <Field
+                id="signin-pass"
+                label="Password"
+                type="password"
+                value={password}
+                onChange={setPassword}
+                placeholder="demo password"
+                autoComplete="current-password"
+            />
 
             {error && <div className="text-xs text-crimson mt-1">{error}</div>}
 
