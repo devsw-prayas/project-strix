@@ -6,7 +6,8 @@
     "dev": "next dev --turbopack",
     "build": "next build --turbopack",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "vercel-build": "next build && echo 'Linting skipped during deployment'"
   },
   "dependencies": {
     "lucide-react": "^0.542.0",
@@ -27,5 +28,5 @@
     "eslint-config-next": "15.5.2",
     "tailwindcss": "^4",
     "typescript": "^5"
-  }
+  },
 }
