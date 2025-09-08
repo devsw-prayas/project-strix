@@ -101,3 +101,70 @@ This system will power:
 **Result**: Even if one node is compromised:  
 - Tampered data fails validation because other DAG replicas + TPM attestation reject it.  
 - Malicious node gets quarantined automatically.  
+
+**Current State**
+Docker Server Setup Complete, inter-node and monitor node communication completed 
+End points for login and register auth completed
+
+Next.js frontend complete
+
+**General Flow**
+
+**Login / Signup**
+1. Client signs data using a chained key setup (TPM parent + TPM child + node key).
+
+
+2. Auth server verifies the signature and attestation locally.
+
+
+3. If valid, the auth server creates a local DAG entry and signs it.
+
+
+4. The entry is propagated to peer nodes.
+
+
+5. Peers re-verify the signature and attestation.
+
+
+6. If all active nodes agree, the DAGs are updated everywhere → login succeeds.
+
+
+7. If any node rejects, a tamper log is created and the event is flagged.
+
+
+
+
+**Transactions**
+
+Layer 1 – Local Fast Path
+
+1. Client signs and submits a transaction.
+
+
+2. Nearest node verifies quickly, appends to its local DAG, and gives the client an immediate success.
+
+
+3. This transaction is gossiped to sibling nodes in the same cluster for redundancy.
+
+
+
+Layer 2 – Global Verification 4. The local cluster forwards the transaction to a global verifier layer.
+5. Global verifier(s) re-validate against the broader DAG consensus.
+6. If confirmed, the transaction is marked Finalized everywhere.
+7. If not, a tamper log is generated and the offending node/transaction is quarantined.
+
+
+
+**Security Principle**
+
+Every step is signed + verified.
+
+Local DAGs = speed and redundancy.
+
+Global DAG = strong consistency and tamper detection.
+
+Tamper logs = immutable audit trail when something fails.
+
+
+
+
